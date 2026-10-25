@@ -11,7 +11,7 @@
 | Section | CS3A |
 | Report date | October 26, 2026 |
 | GitHub issue | [Issue #1](https://github.com/gaynethacol/CCC181Activity/issues/1) |
-| Pull request | Pending — add the actual pull request URL after creating it |
+| Pull request | [View pull request](https://github.com/gaynethacol/CCC181Activity/pull/2) |
 
 LicenseQ is a student prototype with separate queues for application and testing, and printed-card collection. It is not connected to official LTO systems.
 
