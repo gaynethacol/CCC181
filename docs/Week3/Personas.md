@@ -4,7 +4,7 @@ Quote: Hassle kaayo ug dugay kaayo ang paghulat.
 
 | | |
 |---|---|
-| **Photo or sketch** | 👤 Generic applicant icon; not a photograph of the interviewee. |
+| **Photo or sketch** | 👤 |
 | **Age, role and background** | 22-year-old student applying for a new driver’s license at LTO Tubod, Iligan City. *(interview)* |
 | **Goals** | Complete his license application and receive his printed license card. |
 | **Frustrations** | Describes the process as inconvenient and time-consuming. *(interview)* |
@@ -39,7 +39,7 @@ Quote pending: Kung tawagon nako unya wala sila, ibutang nako sila sa pinakaluyo
 
 | | |
 |---|---|
-| **Photo or sketch** | 👤 Generic staff icon; not a photograph of the interviewee. |
+| **Photo or sketch** | 👤 |
 | **Age, role and background** | 32-year-old front-desk employee who checks applicants’ documents and directs them to the next desk. *(interview)* |
 | **Goals** | Check documents for correctness, return them to applicants, and explain where applicants should go next. *(interview)* |
 | **Frustrations** | Reports no particular difficulty managing calls. Absent applicants are moved to the end of the queue. Other pain points need confirmation. *(interview)* |
