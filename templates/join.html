@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Join the queue · LicenseQ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-10 col-lg-8">
+    <h1 class="h3 mb-3">Join the queue</h1>
+    <p>Enter your details and choose your queue.</p>
+
+    <form method="post"
+          action="{{ url_for('join') }}"
+          novalidate
+          id="join-form">
+
+      <div class="mb-3">
+        <label for="name" class="form-label">Full name</label>
+
+        <input id="name"
+               name="name"
+               type="text"
+               autocomplete="name"
+               maxlength="100"
+               required
+               class="form-control {% if errors.get('name') %}is-invalid{% endif %}"
+               value="{{ form.get('name', '') }}"
+               {% if errors.get('name') %}
+               aria-invalid="true"
+               aria-describedby="name-error"
+               {% endif %}>
+
+        {% if errors.get('name') %}
+          <div id="name-error" class="invalid-feedback">
+            {{ errors.get('name') }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label for="contact_number" class="form-label">
+          Contact number
+        </label>
+
+        <input id="contact_number"
+               name="contact_number"
+               type="tel"
+               inputmode="numeric"
+               autocomplete="tel-national"
+               maxlength="11"
+               pattern="09[0-9]{9}"
+               placeholder="09XXXXXXXXX"
+               required
+               class="form-control {% if errors.get('contact_number') %}is-invalid{% endif %}"
+               value="{{ form.get('contact_number', '') }}"
+               {% if errors.get('contact_number') %}
+               aria-invalid="true"
+               aria-describedby="contact-error"
+               {% endif %}>
+
+        {% if errors.get('contact_number') %}
+          <div id="contact-error" class="invalid-feedback">
+            {{ errors.get('contact_number') }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-4">
+        <label for="service_id" class="form-label">Queue</label>
+
+        <select id="service_id"
+                name="service_id"
+                required
+                class="form-select {% if errors.get('service_id') %}is-invalid{% endif %}"
+                aria-describedby="queue-help{% if errors.get('service_id') %} queue-error{% endif %}"
+                {% if errors.get('service_id') %}
+                aria-invalid="true"
+                {% endif %}>
+
+          <option value="">Choose a queue…</option>
+
+          {% for service in services %}
+            <option value="{{ service.id }}"
+                    {% if form.get('service_id') == service.id|string %}
+                    selected
+                    {% endif %}>
+              {{ service.name }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <div id="queue-help" class="form-text">
+          Choose card collection only after staff tell you
+          that you are ready for that stage.
+        </div>
+
+        {% if errors.get('service_id') %}
+          <div id="queue-error" class="invalid-feedback">
+            {{ errors.get('service_id') }}
+          </div>
+        {% endif %}
+      </div>
+
+      <button id="get-ticket"
+              type="submit"
+              class="btn btn-primary w-100">
+        Get a ticket
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
