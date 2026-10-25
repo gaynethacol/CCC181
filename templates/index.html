@@ -1,22 +1,19 @@
 {% extends "base.html" %}
 
+{% block title %}Welcome · LicenseQ{% endblock %}
+
 {% block content %}
-  <h2>LicenseQ Queues</h2>
+<section class="py-4">
+  <h1>Welcome to LicenseQ</h1>
 
-  {% for service in services %}
-    <h3>{{ service.name }}</h3>
+  <p class="lead">
+    Join and track your place in the application and
+    printed-card collection queues at LTO Tubod, Iligan City.
+  </p>
 
-    <ul class="tickets">
-      {% for t in tickets if t.service_id == service.id %}
-        <li>
-          <a href="{{ url_for('ticket', ticket_id=t.number) }}">
-            Ticket #{{ t.number }}
-          </a>
-          — {{ t.status }}
-        </li>
-      {% else %}
-        <li>The queue is empty.</li>
-      {% endfor %}
-    </ul>
-  {% endfor %}
+  <a href="{{ url_for('join_form') }}"
+     class="btn btn-primary btn-lg">
+    Join the queue
+  </a>
+</section>
 {% endblock %}
