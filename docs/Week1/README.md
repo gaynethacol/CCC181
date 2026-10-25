@@ -188,7 +188,7 @@ The MVP of LicenseQ will help applicants at LTO Tubod, Iligan City, join a queue
 
 ## Submission Checklist
 
-- [ ] File saved as `activities/proposed-application/README.md` in my CCC181 repository
-- [ ] All `[bracketed placeholders]` replaced and guidance blockquotes removed
-- [ ] Sections 1–5 complete
-- [ ] Images (if any) placed in `images/` and displaying correctly on GitHub
+- [x] File saved as `activities/proposed-application/README.md` in my CCC181 repository
+- [x] All `[bracketed placeholders]` replaced and guidance blockquotes removed
+- [x] Sections 1–5 complete
+- [x] Images (if any) placed in `images/` and displaying correctly on GitHubgit add docs/
