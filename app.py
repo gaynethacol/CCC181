@@ -55,6 +55,22 @@ def selected_service(raw_value):
     return service_id
 
 
+def people_ahead(current):
+    return sum(
+        1 for item in TICKETS
+        if item["service_id"] == current["service_id"]
+        and item["status"] == "waiting"
+        and queue_order(item) < queue_order(current)
+    )
+
+
+def ticket_service(current):
+    return next(
+        service for service in SERVICES
+        if service["id"] == current["service_id"]
+    )
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -132,26 +148,26 @@ def join():
 
 @app.get("/queue/<int:ticket_id>")
 def ticket(ticket_id):
-    current_ticket = find_ticket(ticket_id)
-
-    ahead = sum(
-        1 for item in TICKETS
-        if item["service_id"] == current_ticket["service_id"]
-        and item["status"] == "waiting"
-        and queue_order(item) < queue_order(current_ticket)
-    )
-
-    service = next(
-        item for item in SERVICES
-        if item["id"] == current_ticket["service_id"]
-    )
+    current = find_ticket(ticket_id)
 
     return render_template(
         "ticket.html",
-        ticket=current_ticket,
-        service=service,
-        ahead=ahead,
+        ticket=current,
+        service=ticket_service(current),
+        ahead=people_ahead(current),
     )
+
+
+@app.get("/queue/<int:ticket_id>/status.json")
+def ticket_status(ticket_id):
+    current = find_ticket(ticket_id)
+    service = ticket_service(current)
+
+    return {
+        "status": current["status"],
+        "ahead": people_ahead(current),
+        "service": service["name"],
+    }
 
 
 @app.post("/queue/<int:ticket_id>/leave")

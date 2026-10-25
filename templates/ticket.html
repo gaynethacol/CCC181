@@ -15,70 +15,198 @@
           #{{ "%03d"|format(ticket.number) }}
         </h2>
 
-        <p>
-          <strong>Queue:</strong> {{ service.name }}
-        </p>
-
         <div id="live-status" aria-live="polite" aria-atomic="true">
           <p>
-            <strong>Status:</strong>
-
-            {% if ticket.status == "waiting" %}
-              <span class="badge text-bg-warning">Waiting</span>
-            {% elif ticket.status == "called" %}
-              <span class="badge text-bg-primary">Called</span>
-            {% elif ticket.status == "served" %}
-              <span class="badge text-bg-success">Served</span>
-            {% else %}
-              <span class="badge text-bg-secondary">No-show</span>
-            {% endif %}
+            <strong>Queue:</strong>
+            <span id="service-name">{{ service.name }}</span>
           </p>
 
-          {% if ticket.status == "waiting" %}
-            <p class="h3 fw-bold">Position: {{ ahead + 1 }}</p>
+          <p>
+            <strong>Status:</strong>
+            <span id="status-badge"
+                  class="badge {% if ticket.status == 'waiting' %}text-bg-warning{% elif ticket.status == 'called' %}text-bg-primary{% elif ticket.status == 'served' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+              {{ ticket.status|capitalize }}
+            </span>
+          </p>
 
-            {% if ahead == 0 %}
-              <p>You're next! Please stay nearby.</p>
-            {% elif ahead == 1 %}
-              <p>1 person ahead of you.</p>
+          <p id="position"
+             class="h3 fw-bold"
+             {% if ticket.status != "waiting" %}hidden{% endif %}>
+            Position: {{ ahead + 1 }}
+          </p>
+
+          <p id="position-message">
+            {% if ticket.status == "waiting" %}
+              {% if ahead == 0 %}
+                You're next! Please stay nearby.
+              {% elif ahead == 1 %}
+                1 person ahead of you.
+              {% else %}
+                {{ ahead }} people ahead of you.
+              {% endif %}
+            {% elif ticket.status == "called" %}
+              It's your turn! Please approach the front desk for instructions.
+            {% elif ticket.status == "served" %}
+              This queue stage is complete. Follow staff instructions.
             {% else %}
-              <p>{{ ahead }} people ahead of you.</p>
+              This ticket is no longer in the active queue.
             {% endif %}
-
-          {% elif ticket.status == "called" %}
-            <p class="h4 fw-bold">It's your turn!</p>
-            <p>Please approach the front desk for instructions.</p>
-
-          {% elif ticket.status == "served" %}
-            <p>This queue stage is complete. Follow staff instructions.</p>
-
-          {% else %}
-            <p>This ticket is no longer in the active queue.</p>
-          {% endif %}
+          </p>
         </div>
+
+        <p id="refresh-info" class="small text-body-secondary">
+          Starting automatic updates…
+        </p>
 
         <a href="{{ url_for('ticket', ticket_id=ticket.number) }}"
            class="btn btn-primary mt-2">
           Refresh status
         </a>
 
-        {% if ticket.status in ["waiting", "called"] %}
-          <form method="post"
-                action="{{ url_for('leave_queue', ticket_id=ticket.number) }}"
-                class="mt-3">
-            <p id="leave-help" class="small text-body-secondary">
-              Leaving removes this ticket from the active queue.
-            </p>
+        <form id="leave-form"
+              method="post"
+              action="{{ url_for('leave_queue', ticket_id=ticket.number) }}"
+              class="mt-3"
+              {% if ticket.status not in ["waiting", "called"] %}hidden{% endif %}>
 
-            <button type="submit"
-                    class="btn btn-outline-danger"
-                    aria-describedby="leave-help">
-              Leave the queue
-            </button>
-          </form>
-        {% endif %}
+          <p id="leave-help" class="small text-body-secondary">
+            Leaving removes this ticket from the active queue.
+          </p>
+
+          <button type="submit"
+                  class="btn btn-outline-danger"
+                  aria-describedby="leave-help">
+            Leave the queue
+          </button>
+        </form>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+(() => {
+  const statusUrl =
+    {{ url_for('ticket_status', ticket_id=ticket.number)|tojson }};
+
+  const badge = document.getElementById("status-badge");
+  const position = document.getElementById("position");
+  const message = document.getElementById("position-message");
+  const serviceName = document.getElementById("service-name");
+  const leaveForm = document.getElementById("leave-form");
+  const refreshInfo = document.getElementById("refresh-info");
+
+  const labels = {
+    waiting: "Waiting",
+    called: "Called",
+    served: "Served",
+    "no-show": "No-show"
+  };
+
+  const styles = {
+    waiting: "text-bg-warning",
+    called: "text-bg-primary",
+    served: "text-bg-success",
+    "no-show": "text-bg-secondary"
+  };
+
+  let refreshing = false;
+
+  function setText(element, text) {
+    if (element.textContent.trim() !== text) {
+      element.textContent = text;
+    }
+  }
+
+  async function refreshStatus() {
+    if (refreshing) return;
+    refreshing = true;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const response = await fetch(statusUrl, {
+        cache: "no-store",
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        refreshInfo.textContent =
+          response.status === 404
+            ? "Ticket unavailable. The server may have restarted."
+            : "Unable to update. Try Refresh status.";
+        return;
+      }
+
+      const data = await response.json();
+
+      if (
+        !Object.prototype.hasOwnProperty.call(labels, data.status) ||
+        !Number.isInteger(data.ahead) ||
+        data.ahead < 0 ||
+        typeof data.service !== "string"
+      ) {
+        refreshInfo.textContent =
+          "Unexpected status response. Try Refresh status.";
+        return;
+      }
+
+      setText(badge, labels[data.status]);
+      badge.className = "badge " + styles[data.status];
+      setText(serviceName, data.service);
+
+      position.hidden = data.status !== "waiting";
+
+      if (data.status === "waiting") {
+        setText(position, "Position: " + (data.ahead + 1));
+
+        if (data.ahead === 0) {
+          setText(message, "You're next! Please stay nearby.");
+        } else if (data.ahead === 1) {
+          setText(message, "1 person ahead of you.");
+        } else {
+          setText(message, data.ahead + " people ahead of you.");
+        }
+      } else if (data.status === "called") {
+        setText(
+          message,
+          "It's your turn! Please approach the front desk for instructions."
+        );
+      } else if (data.status === "served") {
+        setText(
+          message,
+          "This queue stage is complete. Follow staff instructions."
+        );
+      } else {
+        setText(
+          message,
+          "This ticket is no longer in the active queue."
+        );
+      }
+
+      leaveForm.hidden =
+        !["waiting", "called"].includes(data.status);
+
+      refreshInfo.textContent =
+        "Last checked: " + new Date().toLocaleTimeString()
+        + " · Updates every 10 seconds.";
+
+    } catch {
+      refreshInfo.textContent =
+        "Unable to connect. Retrying automatically.";
+    } finally {
+      clearTimeout(timeout);
+      refreshing = false;
+    }
+  }
+
+  refreshStatus();
+  setInterval(refreshStatus, 10000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshStatus();
+  });
+})();
+</script>
 {% endblock %}
