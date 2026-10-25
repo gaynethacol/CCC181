@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>LicenseQ Queues</h2>
+
+  {% for service in services %}
+    <h3>{{ service.name }}</h3>
+
+    <ul class="tickets">
+      {% for t in tickets if t.service_id == service.id %}
+        <li>
+          <a href="{{ url_for('ticket', ticket_id=t.number) }}">
+            Ticket #{{ t.number }}
+          </a>
+          — {{ t.status }}
+        </li>
+      {% else %}
+        <li>The queue is empty.</li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+{% endblock %}
