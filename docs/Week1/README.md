@@ -19,31 +19,28 @@ This problem occurs at the Land Transportation Office (LTO) in Tubod, Iligan Cit
 
 ### 1.2 Evidence from research
 
-> List what you actually observed or heard, from at least two interviews plus any observation or document review.
-
 | Method | Who / where | Key finding |
 |---|---|---|
-| Interview | [e.g., 2nd-year student, working part-time] | [What they said or did] |
-| Interview | [ ] | [ ] |
-| Observation | [e.g., clinic waiting area, Monday 8–10 AM] | [ ] |
-| Document review | [e.g., current logbook or form] | [ ] |
+| Interview | My brother, referred to as “Emoy” | Described the licensing process as inconvenient and time-consuming. |
+| Interview | Front-desk employee | Not yet conducted. Staff procedures and challenges still need confirmation. |
+| Observation | Personal visit to LTO Tubod, Iligan City, approximately six months ago | Observed a crowded waiting area with insufficient seating. Some applicants left because they were tired of waiting. Estimated waiting time was approximately 4–5 hours. |
+| Personal experience | Queue process at LTO Tubod | After submitting documents, applicants waited for their names to be called. Instructions about the next step were given when documents were returned, followed by another wait. Names were called twice before absent applicants were skipped. |
+| Document review | Not conducted | No forms, written queue instructions, or queue policies were reviewed. |1
 
 ### 1.3 Point-of-view (POV) statement
 
-> Format: **[User]** needs **[need]** because **[insight]**.
-
-> [Your POV statement]
+**Driver’s license applicants at LTO Tubod, Iligan City** need **clear information about their turn and the next queue stage** because **long waits and reliance on name calls make it difficult to know their progress and avoid missing their turn**.
 
 ### 1.4 "How might we…?" question
 
-> [How might we … ?]
+How might we help driver’s license applicants at LTO Tubod, Iligan City, understand their queue progress and next steps so they are less likely to miss their turn?
 
 ### 1.5 Self-check
 
-- [ ] Names a real user group
-- [ ] States a need, not a feature
-- [ ] Rests on an insight from research
-- [ ] Is narrow enough to act on and open enough to allow different ideas
+- [x] Names a real user group
+- [x] States a need, not a feature
+- [x] Rests on an insight from research
+- [x] Is narrow enough to act on and open enough to allow different ideas
 
 ---
 
@@ -51,17 +48,17 @@ This problem occurs at the Land Transportation Office (LTO) in Tubod, Iligan Cit
 
 ### 2.1 Primary persona
 
-> Every detail should trace back to your research. Label the persona as fictional if it combines several real people.
+Based on an interview with my brother, using the pseudonym “Emoy.”
 
 | | |
 |---|---|
-| **Name, age** | [e.g., Ana, 20] |
-| **Role / background** | [ ] |
-| **Goals** | [What they are trying to get done] |
-| **Frustrations / pain points** | [What slows or blocks them now] |
-| **Context of use** | [Device, connectivity, time, place] |
-| **Accessibility considerations** | [Vision, language, motor, literacy, etc.] |
-| **Current workaround** | [What they do today without your app] |
+| **Name, age** | Emoy, 22 |
+| **Role / background** | Student applying for a new driver’s license at LTO Tubod, Iligan City. |
+| **Goals** | Complete the licensing process and collect his printed license card. |
+| **Frustrations / pain points** | Finds the process inconvenient and time-consuming. |
+| **Context of use** | Has a smartphone and mobile data. Waits outside the office, where chairs are available. |
+| **Accessibility considerations** | Prefers Bisaya. No difficulty reading small text or using apps was reported. |
+| **Current workaround** | Stays outside the office and listens for his name to be called. |
 
 ### 2.2 User groups and stakeholders
 
