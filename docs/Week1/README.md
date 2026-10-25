@@ -128,7 +128,7 @@ These scores are preliminary estimates based on the project’s requirements, cu
 | FR-01 | As an applicant, I want to join the appropriate queue using my name and contact number so that I receive a ticket. | Must |
 | FR-02 | As an applicant, I want to view my ticket number, queue stage, status, and position so that I know my place in line. | Must |
 | FR-03 | As a front-desk employee, I want to view each queue separately and in order so that I can manage applicants correctly. | Must |
-| FR-04 | As a front-desk employee, I want to call applicants and mark them as served or no-show so that the waiting list stays updated. | Must |
+| FR-04 | As a front-desk employee, I want to call applicants, mark them as served or no-show, and move absent applicants to the end of their current queue so that the waiting list reflects the office’s procedure. | Must |
 | FR-05 | As a front-desk employee, I want to move eligible applicants to the printed-card collection queue so that they can proceed to the next stage. | Must |
 | FR-06 | As an office supervisor, I want a record of queue changes and reasons for changes in order so that I can review concerns about unfair queue handling. | Should |
 | FR-07 | As an applicant, I want an estimated waiting time so that I can plan my time. | Could |
@@ -191,4 +191,4 @@ The MVP of LicenseQ will help applicants at LTO Tubod, Iligan City, join a queue
 - [x] File saved as `activities/proposed-application/README.md` in my CCC181 repository
 - [x] All `[bracketed placeholders]` replaced and guidance blockquotes removed
 - [x] Sections 1–5 complete
-- [x] Images (if any) placed in `images/` and displaying correctly on GitHubgit add docs/
+- [ ] Images (if any) placed in `images/` and displaying correctly on GitHubgit add docs/
