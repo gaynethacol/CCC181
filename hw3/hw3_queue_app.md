@@ -193,10 +193,10 @@ Save the files as `docs/week3/wireframes/` (PNG, JPG or PDF), for example `join-
 
 **Checkpoint 2**
 
-- [ ] Six frames: three screens, each at phone and laptop width.
-- [ ] Every frame names the persona, the device, and the requirement IDs.
-- [ ] The main flow for each persona is marked with arrows.
-- [ ] Committed in `docs/week3/wireframes/`.
+- [x] Six frames: three screens, each at phone and laptop width.
+- [x] Every frame names the persona, the device, and the requirement IDs.
+- [x] The main flow for each persona is marked with arrows.
+- [x] Committed in `docs/week3/wireframes/`.
 
 ---
 
