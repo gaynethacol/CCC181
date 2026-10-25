@@ -13,23 +13,8 @@ SERVICES = [
     {"id": 2, "name": "Printed-Card Collection"},
 ]
 
-# Fictional sample data for local testing.
-TICKETS = [
-    {
-        "number": 1,
-        "name": "Ana",
-        "contact_number": "09000000001",
-        "service_id": 1,
-        "status": "waiting",
-    },
-    {
-        "number": 2,
-        "name": "Ben",
-        "contact_number": "09000000002",
-        "service_id": 2,
-        "status": "waiting",
-    },
-]
+# Tickets are stored in memory and reset when the server restarts.
+TICKETS = []
 
 
 @app.route("/")
@@ -111,12 +96,61 @@ def staff_dashboard():
     return render_template("staff.html")
 
 
-@app.route("/queue/<int:ticket_id>")
+@app.get("/queue/<int:ticket_id>")
 def ticket(ticket_id):
-    if not any(item["number"] == ticket_id for item in TICKETS):
+    current_ticket = next(
+        (item for item in TICKETS if item["number"] == ticket_id),
+        None,
+    )
+
+    if current_ticket is None:
         abort(404)
 
-    return render_template("ticket.html", ticket_id=ticket_id)
+    ahead = sum(
+        1 for item in TICKETS
+        if item["service_id"] == current_ticket["service_id"]
+        and item["status"] == "waiting"
+        and item["number"] < current_ticket["number"]
+    )
+
+    service = next(
+        item for item in SERVICES
+        if item["id"] == current_ticket["service_id"]
+    )
+
+    return render_template(
+        "ticket.html",
+        ticket=current_ticket,
+        service=service,
+        ahead=ahead,
+    )
+
+
+@app.post("/queue/<int:ticket_id>/leave")
+def leave_queue(ticket_id):
+    current_ticket = next(
+        (item for item in TICKETS if item["number"] == ticket_id),
+        None,
+    )
+
+    if current_ticket is None:
+        abort(404)
+
+    if current_ticket["status"] not in ("waiting", "called"):
+        flash(
+            "This ticket is no longer in the active queue.",
+            "warning",
+        )
+        return redirect(url_for("ticket", ticket_id=ticket_id))
+
+    current_ticket["status"] = "no-show"
+
+    flash(
+        f"You left the queue. Ticket #{ticket_id} is no longer active.",
+        "success",
+    )
+
+    return redirect(url_for("index"))
 
 
 @app.route("/hello")

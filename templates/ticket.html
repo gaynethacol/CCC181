@@ -1,76 +1,84 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
-  <title>{% block title %}LicenseQ{% endblock %}</title>
+{% block title %}My place · LicenseQ{% endblock %}
 
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-10">
+    <h1 class="h3 mb-3">My place</h1>
 
-<body class="d-flex flex-column min-vh-100">
-  <a class="visually-hidden-focusable" href="#main">
-    Skip to main content
-  </a>
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <p class="mb-1">Your ticket number</p>
 
-  <nav class="navbar navbar-expand-md bg-primary" data-bs-theme="dark">
-    <div class="container">
-      <a class="navbar-brand" href="{{ url_for('index') }}">LicenseQ</a>
+        <h2 class="display-1 fw-bold mb-3">
+          #{{ "%03d"|format(ticket.number) }}
+        </h2>
 
-      <button class="navbar-toggler" type="button"
-              data-bs-toggle="collapse" data-bs-target="#mainNav"
-              aria-controls="mainNav" aria-expanded="false"
-              aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+        <p>
+          <strong>Queue:</strong> {{ service.name }}
+        </p>
 
-      <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'join_form' %}active{% endif %}"
-               {% if request.endpoint == 'join_form' %}aria-current="page"{% endif %}
-               href="{{ url_for('join_form') }}">
-              Join the queue
-            </a>
-          </li>
+        <div id="live-status" aria-live="polite" aria-atomic="true">
+          <p>
+            <strong>Status:</strong>
 
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'staff_dashboard' %}active{% endif %}"
-               {% if request.endpoint == 'staff_dashboard' %}aria-current="page"{% endif %}
-               href="{{ url_for('staff_dashboard') }}">
-              Staff
-            </a>
-          </li>
-        </ul>
+            {% if ticket.status == "waiting" %}
+              <span class="badge text-bg-warning">Waiting</span>
+            {% elif ticket.status == "called" %}
+              <span class="badge text-bg-primary">Called</span>
+            {% elif ticket.status == "served" %}
+              <span class="badge text-bg-success">Served</span>
+            {% else %}
+              <span class="badge text-bg-secondary">No-show</span>
+            {% endif %}
+          </p>
+
+          {% if ticket.status == "waiting" %}
+            <p class="h3 fw-bold">Position: {{ ahead + 1 }}</p>
+
+            {% if ahead == 0 %}
+              <p>You're next! Please stay nearby.</p>
+            {% elif ahead == 1 %}
+              <p>1 person ahead of you.</p>
+            {% else %}
+              <p>{{ ahead }} people ahead of you.</p>
+            {% endif %}
+
+          {% elif ticket.status == "called" %}
+            <p class="h4 fw-bold">It's your turn!</p>
+            <p>Please approach the front desk for instructions.</p>
+
+          {% elif ticket.status == "served" %}
+            <p>This queue stage is complete. Follow staff instructions.</p>
+
+          {% else %}
+            <p>This ticket is no longer in the active queue.</p>
+          {% endif %}
+        </div>
+
+        <a href="{{ url_for('ticket', ticket_id=ticket.number) }}"
+           class="btn btn-primary mt-2">
+          Refresh status
+        </a>
+
+        {% if ticket.status in ["waiting", "called"] %}
+          <form method="post"
+                action="{{ url_for('leave_queue', ticket_id=ticket.number) }}"
+                class="mt-3">
+            <p id="leave-help" class="small text-body-secondary">
+              Leaving removes this ticket from the active queue.
+            </p>
+
+            <button type="submit"
+                    class="btn btn-outline-danger"
+                    aria-describedby="leave-help">
+              Leave the queue
+            </button>
+          </form>
+        {% endif %}
       </div>
     </div>
-  </nav>
-
-  <main id="main" tabindex="-1" class="container my-4 flex-grow-1">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show"
-             role="alert">
-          {{ message }}
-          <button type="button" class="btn-close"
-                  data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    {% endwith %}
-
-    {% block content %}{% endblock %}
-  </main>
-
-  <footer class="border-top py-3 text-center text-body-secondary small">
-    LicenseQ · CCC181 · Student prototype
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  {% block scripts %}{% endblock %}
-</body>
-</html>
+  </div>
+</div>
+{% endblock %}
