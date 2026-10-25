@@ -27,3 +27,16 @@ Open http://127.0.0.1:5000 in your browser.
 ## Current limitations
 
 Tickets use fictional sample data stored in a Python list. This prototype is not connected to official LTO systems.
+
+## Staff access
+
+The staff dashboard is open without login for this classroom prototype.
+It is intended for local testing with fictional data. Staff authentication
+will be added in a later course activity.
+
+Staff can filter queues, call applicants, mark tickets as served or no-show,
+move an absent applicant to the end, and transfer eligible applicants to
+printed-card collection.
+
+No-show removes a ticket from the active list. Use “Absent — move to end”
+when the applicant should remain in the queue.
