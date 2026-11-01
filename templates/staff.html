@@ -9,10 +9,16 @@
   Student prototype: staff login is not implemented yet.
 </p>
 
+<p>
+  <a class="btn btn-outline-primary"
+     href="{{ url_for('manage_services') }}">
+    Manage services
+  </a>
+</p>
+
 <form method="get"
       action="{{ url_for('staff_dashboard') }}"
       class="mb-3">
-
   <label for="service-filter" class="form-label">Queue</label>
 
   <div class="d-flex gap-2">
@@ -22,10 +28,10 @@
       <option value="">All queues</option>
 
       {% for service in services %}
-        <option value="{{ service.id }}"
-                {% if selected == service.id %}selected{% endif %}>
-          {{ service.name }}
-        </option>
+      <option value="{{ service.id }}"
+              {% if selected == service.id %}selected{% endif %}>
+        {{ service.name }}{% if not service.active %} (inactive){% endif %}
+      </option>
       {% endfor %}
     </select>
 
@@ -38,7 +44,6 @@
 <form method="post"
       action="{{ url_for('call_next') }}"
       class="mb-4">
-
   <input type="hidden"
          name="service_id"
          value="{{ selected if selected is not none else '' }}">
@@ -61,6 +66,7 @@
     <caption>
       Active applicants in queue order for
       {{ names[selected] if selected is not none else "all queues" }}.
+      Joined times use Philippine time.
     </caption>
 
     <thead>
@@ -68,6 +74,7 @@
         <th scope="col">Number</th>
         <th scope="col">Name</th>
         <th scope="col">Queue</th>
+        <th scope="col">Joined</th>
         <th scope="col">Status</th>
         <th scope="col">Actions</th>
       </tr>
@@ -77,13 +84,14 @@
       {% for item in queue %}
       <tr>
         <th scope="row">
-          <a href="{{ url_for('ticket', ticket_id=item.number) }}">
-            #{{ "%03d"|format(item.number) }}
+          <a href="{{ url_for('ticket', ticket_id=item.id) }}">
+            #{{ "%03d"|format(item.id) }}
           </a>
         </th>
 
-        <td>{{ item.name }}</td>
-        <td>{{ names[item.service_id] }}</td>
+        <td>{{ item.user.name }}</td>
+        <td>{{ item.service.name }}</td>
+        <td>{{ item.created_at|manila_time }}</td>
 
         <td>
           <span class="badge {{ 'text-bg-warning' if item.status == 'waiting' else 'text-bg-primary' }}">
@@ -93,52 +101,53 @@
 
         <td style="min-width: 240px;">
           {% if item.status == "waiting" %}
-
           <form method="post"
-                action="{{ url_for('staff_action', ticket_id=item.number, action='call') }}">
-            <input type="hidden" name="service_id"
+                action="{{ url_for('staff_action', ticket_id=item.id, action='call') }}">
+            <input type="hidden"
+                   name="service_id"
                    value="{{ selected if selected is not none else '' }}">
 
             <button class="btn btn-sm btn-primary"
                     type="submit"
-                    aria-label="Call ticket {{ item.number }}">
+                    aria-label="Call ticket {{ item.id }}">
               Call
             </button>
           </form>
 
           {% elif item.status == "called" %}
-
           <div class="d-flex flex-wrap gap-2 mb-3">
             <form method="post"
-                  action="{{ url_for('staff_action', ticket_id=item.number, action='serve') }}">
-              <input type="hidden" name="service_id"
+                  action="{{ url_for('staff_action', ticket_id=item.id, action='serve') }}">
+              <input type="hidden"
+                     name="service_id"
                      value="{{ selected if selected is not none else '' }}">
 
               <button class="btn btn-sm btn-success"
                       type="submit"
-                      aria-label="Mark ticket {{ item.number }} as served">
+                      aria-label="Mark ticket {{ item.id }} as served">
                 Serve
               </button>
             </form>
 
             <form method="post"
-                  action="{{ url_for('staff_action', ticket_id=item.number, action='no-show') }}">
-              <input type="hidden" name="service_id"
+                  action="{{ url_for('staff_action', ticket_id=item.id, action='no-show') }}">
+              <input type="hidden"
+                     name="service_id"
                      value="{{ selected if selected is not none else '' }}">
 
               <button class="btn btn-sm btn-outline-danger"
                       type="submit"
-                      aria-label="Mark ticket {{ item.number }} as no-show">
+                      aria-label="Mark ticket {{ item.id }} as no-show">
                 No-show
               </button>
             </form>
           </div>
 
           <form method="post"
-                action="{{ url_for('staff_action', ticket_id=item.number, action='requeue') }}"
+                action="{{ url_for('staff_action', ticket_id=item.id, action='requeue') }}"
                 class="mb-3">
-
-            <input type="hidden" name="service_id"
+            <input type="hidden"
+                   name="service_id"
                    value="{{ selected if selected is not none else '' }}">
 
             <div class="form-check mb-2">
@@ -146,27 +155,27 @@
                      type="checkbox"
                      name="confirm"
                      value="yes"
-                     id="requeue-{{ item.number }}"
+                     id="requeue-{{ item.id }}"
                      required>
 
               <label class="form-check-label small"
-                     for="requeue-{{ item.number }}">
-                Confirm moving #{{ item.number }} to the end.
+                     for="requeue-{{ item.id }}">
+                Confirm moving #{{ item.id }} to the end.
               </label>
             </div>
 
             <button class="btn btn-sm btn-outline-secondary"
                     type="submit"
-                    aria-label="Move absent ticket {{ item.number }} to the end">
+                    aria-label="Move absent ticket {{ item.id }} to the end">
               Absent — move to end
             </button>
           </form>
 
-          {% if item.service_id == 1 %}
+          {% if item.service_id == application_service_id %}
           <form method="post"
-                action="{{ url_for('staff_action', ticket_id=item.number, action='transfer') }}">
-
-            <input type="hidden" name="service_id"
+                action="{{ url_for('staff_action', ticket_id=item.id, action='transfer') }}">
+            <input type="hidden"
+                   name="service_id"
                    value="{{ selected if selected is not none else '' }}">
 
             <div class="form-check mb-2">
@@ -174,11 +183,11 @@
                      type="checkbox"
                      name="confirm"
                      value="yes"
-                     id="transfer-{{ item.number }}"
+                     id="transfer-{{ item.id }}"
                      required>
 
               <label class="form-check-label small"
-                     for="transfer-{{ item.number }}">
+                     for="transfer-{{ item.id }}">
                 Staff confirm this applicant is eligible
                 for card collection.
               </label>
@@ -186,7 +195,7 @@
 
             <button class="btn btn-sm btn-outline-primary"
                     type="submit"
-                    aria-label="Transfer ticket {{ item.number }} to printed-card collection">
+                    aria-label="Transfer ticket {{ item.id }} to printed-card collection">
               ★ Transfer to card collection
             </button>
           </form>

@@ -40,3 +40,6 @@ printed-card collection.
 
 No-show removes a ticket from the active list. Use “Absent — move to end”
 when the applicant should remain in the queue.
+## Requirements
+
+See [LicenseQ requirements](docs/requirements.md).
