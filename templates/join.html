@@ -10,7 +10,7 @@
 
     <form method="post"
           action="{{ url_for('join') }}"
-          novalidate
+          
           id="join-form">
 
       <div class="mb-3">
@@ -105,7 +105,73 @@
               class="btn btn-primary w-100">
         Get a ticket
       </button>
+
+      <p id="submission-status"
+         class="form-text mt-2"
+         role="status"></p>
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const form = document.getElementById("join-form");
+  const button = document.getElementById("get-ticket");
+  const status = document.getElementById("submission-status");
+
+  let submitting = false;
+
+  form.addEventListener("submit", (event) => {
+    if (event.defaultPrevented) return;
+
+    if (submitting) {
+      event.preventDefault();
+      return;
+    }
+
+    submitting = true;
+    button.disabled = true;
+    button.textContent = "Getting your ticket…";
+    status.textContent = "Please wait while your ticket is created.";
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    submitting = false;
+    button.disabled = false;
+    button.textContent = "Get a ticket";
+    status.textContent = "";
+
+    const navigation = performance.getEntriesByType("navigation")[0];
+    const returnedWithBack =
+      event.persisted ||
+      (navigation && navigation.type === "back_forward");
+
+    if (returnedWithBack) {
+      document.getElementById("name").value = "";
+      document.getElementById("contact_number").value = "";
+      document.getElementById("service_id").value = "";
+
+      form.querySelectorAll(".is-invalid").forEach((field) => {
+        field.classList.remove("is-invalid");
+        field.removeAttribute("aria-invalid");
+
+        if (field.id === "service_id") {
+          field.setAttribute("aria-describedby", "queue-help");
+        } else {
+          field.removeAttribute("aria-describedby");
+        }
+      });
+
+      form.querySelectorAll(".invalid-feedback").forEach((message) => {
+        message.hidden = true;
+      });
+
+      status.textContent =
+        "Returning applicant? Open your existing ticket to check your place.";
+    }
+  });
+})();
+</script>
 {% endblock %}
