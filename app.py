@@ -28,6 +28,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# These are the IDs of your two existing seeded services.
+APPLICATION_SERVICE_ID = 1
+CARD_COLLECTION_SERVICE_ID = 2
+
 
 @app.template_filter("manila_time")
 def manila_time(value):
@@ -39,10 +43,13 @@ def manila_time(value):
     ).strftime("%b %d, %Y · %I:%M %p")
 
 
-def all_services():
-    return db.session.scalars(
-        select(Service).order_by(Service.id)
-    ).all()
+def all_services(active_only=False):
+    statement = select(Service).order_by(Service.id)
+
+    if active_only:
+        statement = statement.where(Service.active.is_(True))
+
+    return db.session.scalars(statement).all()
 
 
 def find_ticket(ticket_id):
@@ -112,7 +119,6 @@ def has_called(service_id=None):
 
 
 def lock_queue_changes():
-    # Serialize staff queue changes using the service rows.
     db.session.scalars(
         select(Service)
         .order_by(Service.id)
@@ -142,7 +148,7 @@ def index():
 def join_form():
     return render_template(
         "join.html",
-        services=all_services(),
+        services=all_services(active_only=True),
         form={},
         errors={},
     )
@@ -174,20 +180,25 @@ def join():
         )
 
     service = (
-        db.session.get(Service, service_id)
+        db.session.scalar(
+            select(Service)
+            .where(Service.id == service_id)
+            .with_for_update()
+        )
         if service_id is not None
         else None
     )
 
-    if service is None:
-        errors["service_id"] = "Choose a queue."
+    if service is None or not service.active:
+        errors["service_id"] = "Choose an available queue."
 
     if errors:
+        db.session.rollback()
         flash("Please fix the highlighted fields.", "danger")
 
         return render_template(
             "join.html",
-            services=all_services(),
+            services=all_services(active_only=True),
             form=form,
             errors=errors,
         ), 400
@@ -216,7 +227,7 @@ def join():
 
         return render_template(
             "join.html",
-            services=all_services(),
+            services=all_services(active_only=True),
             form=form,
             errors={},
         ), 409
@@ -321,6 +332,7 @@ def staff_dashboard():
             for service in services
         },
         selected=service_id,
+        application_service_id=APPLICATION_SERVICE_ID,
         can_call=(
             any(item.status == "waiting" for item in queue)
             and not any(item.status == "called" for item in queue)
@@ -424,9 +436,7 @@ def staff_action(ticket_id, action):
         if action == "serve":
             current.served_at = datetime.now(timezone.utc)
 
-        message = (
-            f"Ticket #{ticket_id} marked {current.status}."
-        )
+        message = f"Ticket #{ticket_id} marked {current.status}."
 
     elif action == "requeue":
         if current.status != "called":
@@ -448,7 +458,7 @@ def staff_action(ticket_id, action):
 
     else:
         if (
-            current.service.name != "Application and Testing"
+            current.service_id != APPLICATION_SERVICE_ID
             or current.status != "called"
         ):
             return reject(
@@ -460,13 +470,11 @@ def staff_action(ticket_id, action):
                 "Confirm eligibility before transferring."
             )
 
-        destination = db.session.scalar(
-            select(Service).where(
-                Service.name == "Printed-Card Collection"
-            )
+        destination = db.session.get(
+            Service, CARD_COLLECTION_SERVICE_ID
         )
 
-        if destination is None:
+        if destination is None or not destination.active:
             return reject(
                 "The printed-card collection queue is unavailable."
             )
@@ -485,6 +493,157 @@ def staff_action(ticket_id, action):
         flash(message, "info")
 
     return back()
+
+
+def service_form_values():
+    name = request.form.get("name", "").strip()
+    avg_minutes = request.form.get("avg_minutes", type=int)
+
+    if not name or len(name) > 100:
+        return None, None, "Enter a service name of 1–100 characters."
+
+    if avg_minutes is None or not 1 <= avg_minutes <= 2147483647:
+        return None, None, "Enter a positive whole number for minutes."
+
+    return name, avg_minutes, None
+
+
+def render_services(form=None, editing=None, status=200):
+    ticket_counts = dict(
+        db.session.execute(
+            select(
+                Ticket.service_id,
+                func.count(Ticket.id),
+            ).group_by(Ticket.service_id)
+        ).all()
+    )
+
+    return render_template(
+        "services.html",
+        services=all_services(),
+        ticket_counts=ticket_counts,
+        form=form or {},
+        editing=editing,
+    ), status
+
+
+@app.get("/staff/services")
+def manage_services():
+    return render_services()
+
+
+@app.post("/staff/services")
+def create_service():
+    name, avg_minutes, error = service_form_values()
+
+    if error:
+        flash(error, "danger")
+        return render_services(
+            form=request.form,
+            status=400,
+        )
+
+    db.session.add(
+        Service(
+            name=name,
+            avg_minutes=avg_minutes,
+            active=True,
+        )
+    )
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "A service with that name already exists.",
+            "danger",
+        )
+        return render_services(
+            form=request.form,
+            status=409,
+        )
+
+    flash("Service created.", "success")
+    return redirect(url_for("manage_services"))
+
+
+@app.post("/staff/services/<int:service_id>/<action>")
+def manage_service_action(service_id, action):
+    if action not in ("edit", "toggle", "delete"):
+        abort(404)
+
+    lock_queue_changes()
+    service = db.get_or_404(Service, service_id)
+
+    if action == "edit":
+        name, avg_minutes, error = service_form_values()
+
+        if error:
+            db.session.rollback()
+            flash(error, "danger")
+            return render_services(
+                form=request.form,
+                editing=service_id,
+                status=400,
+            )
+
+        service.name = name
+        service.avg_minutes = avg_minutes
+        message = "Service updated."
+
+    elif action == "toggle":
+        service.active = not service.active
+
+        message = (
+            "Service activated."
+            if service.active
+            else "Service deactivated. Existing tickets are retained."
+        )
+
+    else:
+        if request.form.get("confirm") != "yes":
+            db.session.rollback()
+            flash(
+                "Confirm deletion before continuing.",
+                "warning",
+            )
+            return redirect(url_for("manage_services"))
+
+        has_tickets = db.session.scalar(
+            select(Ticket.id)
+            .where(Ticket.service_id == service_id)
+            .limit(1)
+        )
+
+        if has_tickets is not None:
+            db.session.rollback()
+            flash(
+                "This service has tickets. Deactivate it instead.",
+                "warning",
+            )
+            return redirect(url_for("manage_services"))
+
+        db.session.delete(service)
+        message = "Unused service deleted."
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "Unable to save. The name may already exist, "
+            "or the service may have linked tickets.",
+            "danger",
+        )
+        return render_services(
+            form=request.form,
+            editing=service_id if action == "edit" else None,
+            status=409,
+        )
+
+    flash(message, "success")
+    return redirect(url_for("manage_services"))
 
 
 @app.get("/hello")

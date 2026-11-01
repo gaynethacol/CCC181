@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Manage services · LicenseQ Staff{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-3">Manage services</h1>
+
+<p>
+  <a href="{{ url_for('staff_dashboard') }}">
+    Back to staff dashboard
+  </a>
+</p>
+
+<p class="small text-body-secondary">
+  Student prototype: staff login is not implemented yet.
+</p>
+
+<section class="card mb-4" aria-labelledby="create-heading">
+  <div class="card-body">
+    <h2 id="create-heading" class="h5">Create a service</h2>
+
+    <form method="post" action="{{ url_for('create_service') }}">
+      <div class="mb-3">
+        <label for="new-name" class="form-label">
+          Service name
+        </label>
+
+        <input id="new-name"
+               name="name"
+               class="form-control"
+               maxlength="100"
+               value="{{ form.get('name', '') if editing is none else '' }}"
+               required>
+      </div>
+
+      <div class="mb-3">
+        <label for="new-minutes" class="form-label">
+          Average service duration (minutes)
+        </label>
+
+        <input id="new-minutes"
+               name="avg_minutes"
+               type="number"
+               class="form-control"
+               min="1"
+               max="2147483647"
+               step="1"
+               value="{{ form.get('avg_minutes', '') if editing is none else '' }}"
+               required>
+      </div>
+
+      <button class="btn btn-primary" type="submit">
+        Create service
+      </button>
+    </form>
+  </div>
+</section>
+
+<p class="small text-body-secondary">
+  Average duration is a configuration value, not a promised waiting time.
+</p>
+
+<h2 class="h4">Existing services</h2>
+
+{% for service in services %}
+<section class="card mb-3"
+         aria-labelledby="service-heading-{{ service.id }}">
+  <div class="card-body">
+    <h3 id="service-heading-{{ service.id }}" class="h5">
+      {{ service.name }}
+    </h3>
+
+    <p>
+      <span class="badge {{ 'text-bg-success' if service.active else 'text-bg-secondary' }}">
+        {{ 'Active' if service.active else 'Inactive' }}
+      </span>
+
+      · {{ ticket_counts.get(service.id, 0) }} saved ticket(s)
+    </p>
+
+    <form method="post"
+          action="{{ url_for('manage_service_action', service_id=service.id, action='edit') }}"
+          class="mb-3">
+      <div class="mb-3">
+        <label for="name-{{ service.id }}" class="form-label">
+          Service name
+        </label>
+
+        <input id="name-{{ service.id }}"
+               name="name"
+               class="form-control"
+               maxlength="100"
+               value="{{ form.get('name', '') if editing == service.id else service.name }}"
+               required>
+      </div>
+
+      <div class="mb-3">
+        <label for="minutes-{{ service.id }}" class="form-label">
+          Average service duration (minutes)
+        </label>
+
+        <input id="minutes-{{ service.id }}"
+               name="avg_minutes"
+               type="number"
+               class="form-control"
+               min="1"
+               max="2147483647"
+               step="1"
+               value="{{ form.get('avg_minutes', '') if editing == service.id else service.avg_minutes }}"
+               required>
+      </div>
+
+      <button class="btn btn-outline-primary"
+              type="submit"
+              aria-label="Save changes to {{ service.name }}">
+        Save changes
+      </button>
+    </form>
+
+    <form method="post"
+          action="{{ url_for('manage_service_action', service_id=service.id, action='toggle') }}"
+          class="mb-3">
+      <button class="btn btn-outline-secondary"
+              type="submit"
+              aria-label="{{ 'Deactivate' if service.active else 'Activate' }} {{ service.name }}">
+        {{ 'Deactivate' if service.active else 'Activate' }}
+      </button>
+    </form>
+
+    {% if ticket_counts.get(service.id, 0) == 0 %}
+    <form method="post"
+          action="{{ url_for('manage_service_action', service_id=service.id, action='delete') }}">
+      <div class="form-check mb-2">
+        <input class="form-check-input"
+               type="checkbox"
+               name="confirm"
+               value="yes"
+               id="delete-{{ service.id }}"
+               required>
+
+        <label class="form-check-label"
+               for="delete-{{ service.id }}">
+          Confirm permanently deleting {{ service.name }}.
+        </label>
+      </div>
+
+      <button class="btn btn-outline-danger"
+              type="submit"
+              aria-label="Delete unused service {{ service.name }}">
+        Delete unused service
+      </button>
+    </form>
+    {% else %}
+    <p class="small mb-0">
+      Deletion is blocked because this service has tickets.
+      You can deactivate it.
+    </p>
+    {% endif %}
+  </div>
+</section>
+{% else %}
+<p class="alert alert-info">
+  No services yet. Create one above.
+</p>
+{% endfor %}
+{% endblock %}
