@@ -1,6 +1,6 @@
 # LicenseQ — PostgreSQL Persistence Test
 
-All five tickets kept their IDs, services, and statuses after the PostgreSQL container was removed and recreated. Ticket #011 was still marked Called on the Staff dashboard.
+All five tickets kept their IDs, services, and statuses after the PostgreSQL container was removed and recreated. Ticket #011 was still marked **Called** on the Staff dashboard.
 
 ## How I tested persistence
 
@@ -25,7 +25,7 @@ ORDER BY t.id;
 | 4 | Printed-Card Collection | served | served |
 | 11 | Application and Testing | called | called |
 
-Both queries returned 5 rows.
+Both queries returned the same 5 rows.
 
 ## Staff dashboard before restart
 
@@ -36,3 +36,21 @@ Both queries returned 5 rows.
 ![Staff dashboard after restart showing ticket 011 as Called](screenshots/persistence-after.png)
 
 The dashboard shows only waiting or called tickets. Ticket #011 was the only active ticket, while PostgreSQL retained all five records.
+
+## Clean database rebuild
+
+After saving the restart evidence, I ran `docker compose down -v` to remove the database volume. I ran `docker compose up -d` to create a fresh volume, waited for PostgreSQL to become healthy, and applied the migrations. Then I ran `seed.py`, which reported `Seeding complete. Added 2 service(s).`
+
+I checked the rebuilt database with these queries:
+
+```sql
+SELECT id, name, active FROM services ORDER BY id;
+SELECT COUNT(*) FROM tickets;
+```
+
+| Service ID | Service | Active |
+|---|---|---|
+| 1 | Application and Testing | Yes |
+| 2 | Printed-Card Collection | Yes |
+
+The ticket count was **0**. With a fresh volume, the migrations recreated the tables and the seed script restored both active licensing services.
