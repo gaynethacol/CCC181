@@ -30,10 +30,12 @@ class User(db.Model):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(db.String(100), nullable=False)
+
     contact_number: Mapped[str] = mapped_column(
         db.String(11),
         nullable=False,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         db.DateTime(timezone=True),
         nullable=False,
@@ -64,6 +66,12 @@ class Service(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(db.String(100), nullable=False)
     avg_minutes: Mapped[int] = mapped_column(nullable=False)
+
+    active: Mapped[bool] = mapped_column(
+        db.Boolean,
+        nullable=False,
+        server_default="true",
+    )
 
     tickets: Mapped[list["Ticket"]] = relationship(
         back_populates="service",
