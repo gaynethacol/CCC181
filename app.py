@@ -1,13 +1,18 @@
-"""LicenseQ: a student driver's licensing queue prototype."""
+"""LicenseQ: a driver's licensing queue prototype."""
 
 import os
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from flask import (
     Flask, abort, flash, redirect,
-    render_template, request, url_for
+    render_template, request, url_for,
 )
 from flask_migrate import Migrate
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from models import db, User, Service, Ticket
 
@@ -24,37 +29,24 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 
-# Temporary sample services until the database migration is complete.
-SERVICES = [
-    {"id": 1, "name": "Application and Testing"},
-    {"id": 2, "name": "Printed-Card Collection"},
-]
+@app.template_filter("manila_time")
+def manila_time(value):
+    if value is None:
+        return "—"
 
-# Temporary in-memory tickets; database storage comes in a later step.
-TICKETS = []
-
-
-def queue_order(item):
-    return item.get("queue_order", item["number"])
+    return value.astimezone(
+        ZoneInfo("Asia/Manila")
+    ).strftime("%b %d, %Y · %I:%M %p")
 
 
-def next_queue_order():
-    return max(
-        (queue_order(item) for item in TICKETS),
-        default=0,
-    ) + 1
+def all_services():
+    return db.session.scalars(
+        select(Service).order_by(Service.id)
+    ).all()
 
 
 def find_ticket(ticket_id):
-    current = next(
-        (item for item in TICKETS if item["number"] == ticket_id),
-        None,
-    )
-
-    if current is None:
-        abort(404)
-
-    return current
+    return db.get_or_404(Ticket, ticket_id)
 
 
 def selected_service(raw_value):
@@ -66,26 +58,79 @@ def selected_service(raw_value):
     except (TypeError, ValueError):
         abort(400)
 
-    if service_id not in [service["id"] for service in SERVICES]:
+    if db.session.get(Service, service_id) is None:
         abort(400)
 
     return service_id
 
 
 def people_ahead(current):
-    return sum(
-        1 for item in TICKETS
-        if item["service_id"] == current["service_id"]
-        and item["status"] == "waiting"
-        and queue_order(item) < queue_order(current)
+    return db.session.scalar(
+        select(func.count(Ticket.id)).where(
+            Ticket.service_id == current.service_id,
+            Ticket.status == "waiting",
+            or_(
+                Ticket.queued_at < current.queued_at,
+                and_(
+                    Ticket.queued_at == current.queued_at,
+                    Ticket.id < current.id,
+                ),
+            ),
+        )
     )
 
 
-def ticket_service(current):
-    return next(
-        service for service in SERVICES
-        if service["id"] == current["service_id"]
+def first_waiting(service_id=None):
+    statement = select(Ticket).where(
+        Ticket.status == "waiting"
     )
+
+    if service_id is not None:
+        statement = statement.where(
+            Ticket.service_id == service_id
+        )
+
+    return db.session.scalar(
+        statement.order_by(
+            Ticket.queued_at,
+            Ticket.id,
+        ).limit(1)
+    )
+
+
+def has_called(service_id=None):
+    statement = select(Ticket.id).where(
+        Ticket.status == "called"
+    )
+
+    if service_id is not None:
+        statement = statement.where(
+            Ticket.service_id == service_id
+        )
+
+    return db.session.scalar(statement.limit(1)) is not None
+
+
+def lock_queue_changes():
+    # Serialize staff queue changes using the service rows.
+    db.session.scalars(
+        select(Service)
+        .order_by(Service.id)
+        .with_for_update()
+    ).all()
+
+
+def save_change():
+    try:
+        db.session.commit()
+        return True
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "The change could not be saved. Refresh and try again.",
+            "danger",
+        )
+        return False
 
 
 @app.get("/")
@@ -97,7 +142,7 @@ def index():
 def join_form():
     return render_template(
         "join.html",
-        services=SERVICES,
+        services=all_services(),
         form={},
         errors={},
     )
@@ -128,7 +173,13 @@ def join():
             "Enter an 11-digit mobile number starting with 09."
         )
 
-    if service_id not in [service["id"] for service in SERVICES]:
+    service = (
+        db.session.get(Service, service_id)
+        if service_id is not None
+        else None
+    )
+
+    if service is None:
         errors["service_id"] = "Choose a queue."
 
     if errors:
@@ -136,31 +187,48 @@ def join():
 
         return render_template(
             "join.html",
-            services=SERVICES,
+            services=all_services(),
             form=form,
             errors=errors,
         ), 400
 
-    number = max(
-        (item["number"] for item in TICKETS),
-        default=0,
-    ) + 1
+    applicant = User(
+        name=name,
+        contact_number=contact_number,
+    )
 
-    TICKETS.append({
-        "number": number,
-        "name": name,
-        "contact_number": contact_number,
-        "service_id": service_id,
-        "status": "waiting",
-        "queue_order": next_queue_order(),
-    })
+    current = Ticket(
+        user=applicant,
+        service=service,
+        status="waiting",
+    )
+
+    db.session.add(current)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "Your ticket could not be saved. Check your details and retry.",
+            "danger",
+        )
+
+        return render_template(
+            "join.html",
+            services=all_services(),
+            form=form,
+            errors={},
+        ), 409
 
     flash(
-        f"You joined the queue. Your ticket is #{number}.",
+        f"You joined the queue. Your ticket is #{current.id}.",
         "success",
     )
 
-    return redirect(url_for("ticket", ticket_id=number))
+    return redirect(
+        url_for("ticket", ticket_id=current.id)
+    )
 
 
 @app.get("/queue/<int:ticket_id>")
@@ -170,7 +238,7 @@ def ticket(ticket_id):
     return render_template(
         "ticket.html",
         ticket=current,
-        service=ticket_service(current),
+        service=current.service,
         ahead=people_ahead(current),
     )
 
@@ -178,34 +246,41 @@ def ticket(ticket_id):
 @app.get("/queue/<int:ticket_id>/status.json")
 def ticket_status(ticket_id):
     current = find_ticket(ticket_id)
-    service = ticket_service(current)
 
     return {
-        "status": current["status"],
+        "status": current.status,
         "ahead": people_ahead(current),
-        "service": service["name"],
-    }
+        "service": current.service.name,
+    }, 200, {"Cache-Control": "no-store"}
 
 
 @app.post("/queue/<int:ticket_id>/leave")
 def leave_queue(ticket_id):
+    lock_queue_changes()
     current = find_ticket(ticket_id)
 
-    if current["status"] not in ("waiting", "called"):
+    if current.status != "waiting":
+        db.session.rollback()
         flash(
-            "This ticket is no longer in the active queue.",
+            "Only a waiting ticket can leave the queue.",
             "warning",
         )
-        return redirect(url_for("ticket", ticket_id=ticket_id))
+        return redirect(
+            url_for("ticket", ticket_id=ticket_id)
+        )
 
-    current["status"] = "no-show"
+    current.status = "left"
 
-    flash(
-        f"You left the queue. Ticket #{ticket_id} is no longer active.",
-        "success",
+    if save_change():
+        flash(
+            f"You left the queue. Ticket #{ticket_id} is no longer active.",
+            "success",
+        )
+        return redirect(url_for("index"))
+
+    return redirect(
+        url_for("ticket", ticket_id=ticket_id)
     )
-
-    return redirect(url_for("index"))
 
 
 @app.get("/staff")
@@ -214,29 +289,41 @@ def staff_dashboard():
         request.args.get("service_id")
     )
 
-    queue = [
-        item for item in TICKETS
-        if item["status"] in ("waiting", "called")
-        and (
-            service_id is None
-            or item["service_id"] == service_id
+    statement = (
+        select(Ticket)
+        .options(
+            joinedload(Ticket.user),
+            joinedload(Ticket.service),
         )
-    ]
+        .where(Ticket.status.in_(("waiting", "called")))
+    )
 
-    queue.sort(key=queue_order)
+    if service_id is not None:
+        statement = statement.where(
+            Ticket.service_id == service_id
+        )
+
+    queue = db.session.scalars(
+        statement.order_by(
+            Ticket.queued_at,
+            Ticket.id,
+        )
+    ).all()
+
+    services = all_services()
 
     return render_template(
         "staff.html",
         queue=queue,
-        services=SERVICES,
+        services=services,
         names={
-            service["id"]: service["name"]
-            for service in SERVICES
+            service.id: service.name
+            for service in services
         },
         selected=service_id,
         can_call=(
-            any(item["status"] == "waiting" for item in queue)
-            and not any(item["status"] == "called" for item in queue)
+            any(item.status == "waiting" for item in queue)
+            and not any(item.status == "called" for item in queue)
         ),
     )
 
@@ -247,29 +334,32 @@ def call_next():
         request.form.get("service_id")
     )
 
-    queue = [
-        item for item in TICKETS
-        if service_id is None or item["service_id"] == service_id
-    ]
+    lock_queue_changes()
 
-    if any(item["status"] == "called" for item in queue):
-        flash("Resolve the currently called ticket first.", "warning")
+    if has_called(service_id):
+        db.session.rollback()
+        flash(
+            "Resolve the currently called ticket first.",
+            "warning",
+        )
     else:
-        waiting = [
-            item for item in queue
-            if item["status"] == "waiting"
-        ]
+        current = first_waiting(service_id)
 
-        if waiting:
-            current = min(waiting, key=queue_order)
-            current["status"] = "called"
-
+        if current is None:
+            db.session.rollback()
             flash(
-                f"Calling ticket #{current['number']}.",
+                "No applicants are waiting in this queue.",
                 "info",
             )
         else:
-            flash("No applicants are waiting in this queue.", "info")
+            current.status = "called"
+            current.called_at = datetime.now(timezone.utc)
+
+            if save_change():
+                flash(
+                    f"Calling ticket #{current.id}.",
+                    "info",
+                )
 
     return redirect(
         url_for("staff_dashboard", service_id=service_id)
@@ -278,116 +368,121 @@ def call_next():
 
 @app.post("/staff/tickets/<int:ticket_id>/<action>")
 def staff_action(ticket_id, action):
-    if action not in ("call", "serve", "no-show", "requeue", "transfer"):
+    if action not in (
+        "call", "serve", "no-show", "requeue", "transfer"
+    ):
         abort(404)
-
-    current = find_ticket(ticket_id)
 
     service_id = selected_service(
         request.form.get("service_id")
     )
+
+    lock_queue_changes()
+    current = find_ticket(ticket_id)
 
     def back():
         return redirect(
             url_for("staff_dashboard", service_id=service_id)
         )
 
-    if current["status"] not in ("waiting", "called"):
-        flash("This ticket is no longer active.", "warning")
+    def reject(message):
+        db.session.rollback()
+        flash(message, "warning")
         return back()
 
+    if current.status not in ("waiting", "called"):
+        return reject("This ticket is no longer active.")
+
     if action == "call":
-        if current["status"] != "waiting":
-            flash("This ticket has already been called.", "warning")
-            return back()
+        if current.status != "waiting":
+            return reject("This ticket has already been called.")
 
-        same_queue = [
-            item for item in TICKETS
-            if item["service_id"] == current["service_id"]
-        ]
-
-        if any(item["status"] == "called" for item in same_queue):
-            flash(
-                "Resolve the called ticket in this queue first.",
-                "warning",
+        if has_called(current.service_id):
+            return reject(
+                "Resolve the called ticket in this queue first."
             )
-            return back()
 
-        first = min(
-            (
-                item for item in same_queue
-                if item["status"] == "waiting"
-            ),
-            key=queue_order,
-        )
+        first = first_waiting(current.service_id)
 
-        if first["number"] != ticket_id:
-            flash("Call the first waiting applicant first.", "warning")
-            return back()
+        if first is None or first.id != current.id:
+            return reject("Call the first waiting applicant first.")
 
-        current["status"] = "called"
-        flash(f"Calling ticket #{ticket_id}.", "info")
+        current.status = "called"
+        current.called_at = datetime.now(timezone.utc)
+        message = f"Calling ticket #{ticket_id}."
 
     elif action in ("serve", "no-show"):
-        if current["status"] != "called":
-            flash(
-                "Call this applicant before updating the outcome.",
-                "warning",
+        if current.status != "called":
+            return reject(
+                "Call this applicant before updating the outcome."
             )
-            return back()
 
-        current["status"] = (
+        current.status = (
             "served" if action == "serve" else "no-show"
         )
 
-        flash(
-            f"Ticket #{ticket_id} marked {current['status']}.",
-            "info",
+        if action == "serve":
+            current.served_at = datetime.now(timezone.utc)
+
+        message = (
+            f"Ticket #{ticket_id} marked {current.status}."
         )
 
     elif action == "requeue":
-        if current["status"] != "called":
-            flash(
-                "Only a called applicant can be moved to the end.",
-                "warning",
+        if current.status != "called":
+            return reject(
+                "Only a called applicant can be moved to the end."
             )
-            return back()
 
         if request.form.get("confirm") != "yes":
-            flash("Confirm the move before continuing.", "warning")
-            return back()
+            return reject("Confirm the move before continuing.")
 
-        current["queue_order"] = next_queue_order()
-        current["status"] = "waiting"
+        current.queued_at = datetime.now(timezone.utc)
+        current.called_at = None
+        current.served_at = None
+        current.status = "waiting"
 
-        flash(
-            f"Ticket #{ticket_id} moved to the end of its queue.",
-            "info",
+        message = (
+            f"Ticket #{ticket_id} moved to the end of its queue."
         )
 
-    elif action == "transfer":
-        if current["service_id"] != 1 or current["status"] != "called":
-            flash(
-                "Call an application-stage ticket before transferring.",
-                "warning",
+    else:
+        if (
+            current.service.name != "Application and Testing"
+            or current.status != "called"
+        ):
+            return reject(
+                "Call an application-stage ticket before transferring."
             )
-            return back()
 
         if request.form.get("confirm") != "yes":
-            flash(
-                "Confirm eligibility before transferring.",
-                "warning",
+            return reject(
+                "Confirm eligibility before transferring."
             )
-            return back()
 
-        current["queue_order"] = next_queue_order()
-        current["service_id"] = 2
-        current["status"] = "waiting"
-
-        flash(
-            f"Ticket #{ticket_id} transferred to card collection.",
-            "success",
+        destination = db.session.scalar(
+            select(Service).where(
+                Service.name == "Printed-Card Collection"
+            )
         )
+
+        if destination is None:
+            return reject(
+                "The printed-card collection queue is unavailable."
+            )
+
+        current.service = destination
+        current.queued_at = datetime.now(timezone.utc)
+        current.called_at = None
+        current.served_at = None
+        current.status = "waiting"
+
+        message = (
+            f"Ticket #{ticket_id} transferred to card collection."
+        )
+
+    if save_change():
+        flash(message, "info")
 
     return back()
 
