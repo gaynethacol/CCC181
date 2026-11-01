@@ -12,7 +12,7 @@
         <p class="mb-1">Your ticket number</p>
 
         <h2 class="display-1 fw-bold mb-3">
-          #{{ "%03d"|format(ticket.number) }}
+          #{{ "%03d"|format(ticket.id) }}
         </h2>
 
         <div id="live-status" aria-live="polite" aria-atomic="true">
@@ -58,14 +58,14 @@
           Starting automatic updates…
         </p>
 
-        <a href="{{ url_for('ticket', ticket_id=ticket.number) }}"
+        <a href="{{ url_for('ticket', ticket_id=ticket.id) }}"
            class="btn btn-primary mt-2">
           Refresh status
         </a>
 
         <form id="leave-form"
               method="post"
-              action="{{ url_for('leave_queue', ticket_id=ticket.number) }}"
+              action="{{ url_for('leave_queue', ticket_id=ticket.id) }}"
               class="mt-3"
               {% if ticket.status not in ["waiting", "called"] %}hidden{% endif %}>
 
@@ -87,7 +87,7 @@
 <script>
 (() => {
   const statusUrl =
-    {{ url_for('ticket_status', ticket_id=ticket.number)|tojson }};
+    {{ url_for('ticket_status', ticket_id=ticket.id)|tojson }};
 
   const badge = document.getElementById("status-badge");
   const position = document.getElementById("position");
