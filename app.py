@@ -28,7 +28,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
-# These are the IDs of your two existing seeded services.
 APPLICATION_SERVICE_ID = 1
 CARD_COLLECTION_SERVICE_ID = 2
 
@@ -179,6 +178,7 @@ def join():
             "Enter an 11-digit mobile number starting with 09."
         )
 
+    # Serialize joins to the same service before checking duplicates.
     service = (
         db.session.scalar(
             select(Service)
@@ -202,6 +202,34 @@ def join():
             form=form,
             errors=errors,
         ), 400
+
+    # Reopen an existing waiting or called ticket for the same details.
+    existing = db.session.scalar(
+        select(Ticket)
+        .join(Ticket.user)
+        .where(
+            Ticket.service_id == service_id,
+            Ticket.status.in_(("waiting", "called")),
+            func.lower(User.name) == func.lower(name),
+            User.contact_number == contact_number,
+        )
+        .order_by(Ticket.id)
+        .limit(1)
+    )
+
+    if existing is not None:
+        existing_id = existing.id
+        db.session.rollback()
+
+        flash(
+            f"You already have an active ticket for this queue: "
+            f"#{existing_id}.",
+            "info",
+        )
+
+        return redirect(
+            url_for("ticket", ticket_id=existing_id)
+        )
 
     applicant = User(
         name=name,
@@ -493,6 +521,37 @@ def staff_action(ticket_id, action):
         flash(message, "info")
 
     return back()
+
+
+@app.post("/staff/tickets/<int:ticket_id>/delete")
+def delete_ticket(ticket_id):
+    service_id = selected_service(
+        request.form.get("service_id")
+    )
+
+    if request.form.get("confirm") != "yes":
+        flash(
+            "Confirm ticket deletion before continuing.",
+            "warning",
+        )
+        return redirect(
+            url_for("staff_dashboard", service_id=service_id)
+        )
+
+    lock_queue_changes()
+    current = find_ticket(ticket_id)
+
+    db.session.delete(current)
+
+    if save_change():
+        flash(
+            f"Ticket #{ticket_id} permanently deleted.",
+            "success",
+        )
+
+    return redirect(
+        url_for("staff_dashboard", service_id=service_id)
+    )
 
 
 def service_form_values():
