@@ -1,19 +1,36 @@
 """LicenseQ: a student driver's licensing queue prototype."""
 
+import os
+
+from dotenv import load_dotenv
 from flask import (
     Flask, abort, flash, redirect,
     render_template, request, url_for
 )
+from flask_migrate import Migrate
+
+from models import db, User, Service, Ticket
+
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "dev-only-change-me"
 
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+migrate = Migrate(app, db)
+
+
+# Temporary sample services until the database migration is complete.
 SERVICES = [
     {"id": 1, "name": "Application and Testing"},
     {"id": 2, "name": "Printed-Card Collection"},
 ]
 
-# Tickets reset whenever the server restarts.
+# Temporary in-memory tickets; database storage comes in a later step.
 TICKETS = []
 
 
@@ -212,7 +229,10 @@ def staff_dashboard():
         "staff.html",
         queue=queue,
         services=SERVICES,
-        names={service["id"]: service["name"] for service in SERVICES},
+        names={
+            service["id"]: service["name"]
+            for service in SERVICES
+        },
         selected=service_id,
         can_call=(
             any(item["status"] == "waiting" for item in queue)
